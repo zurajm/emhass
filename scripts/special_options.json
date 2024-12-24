@@ -77,6 +77,11 @@
       "strings_per_inverter": 3
     }
   ],
+  "list_horizon_profile": [
+    {
+      "horizon_profile": [0]
+    }
+  ],
   "set_use_battery": true,
   "battery_discharge_power_max": 8000,
   "battery_charge_power_max": 7000,

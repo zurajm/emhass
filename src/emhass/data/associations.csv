@@ -61,3 +61,4 @@ plant_conf,Enom,battery_nominal_energy_capacity
 plant_conf,SOCmin,battery_minimum_state_of_charge
 plant_conf,SOCmax,battery_maximum_state_of_charge
 plant_conf,SOCtarget,battery_target_state_of_charge
+plant_conf,horizon_profile,horizon_profile,list_horizon_profile

@@ -102,6 +102,9 @@
   "strings_per_inverter": [
     1
   ],
+  "horizon_profile": [
+    [0]
+  ],
   "inverter_is_hybrid": false,
   "compute_curtailment": false,
   "set_use_battery": false,

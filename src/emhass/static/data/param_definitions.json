@@ -266,6 +266,12 @@
       "Description": "The number of used strings per inverter. Defaults to 1. This parameter can be a list of items to enable the simulation of mixed orientation systems.",
       "input": "array.int",
       "default_value": 1
+    },
+    "horizon_profile": {
+      "friendly_name": "Horizon profile",
+      "Description": "Horizon profile to apply shading to dni and global poa. Defaults to [0]. This parameter can be a list of items to enable the simulation of mixed orientation systems.",
+      "input": "array.float",
+      "default_value": [0]
     }
   },
   "Deferrable Loads": {

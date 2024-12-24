@@ -592,6 +592,54 @@ class Forecast(object):
         irrads = pd.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
         return irrads
 
+    def apply_horizon_shading(
+        self, df_weather: pd.Series, horizon_profile: pd.Series = [0]
+    ) -> pd.DataFrame:
+        """
+        Apply horizon shading to dni and global poa.
+
+        1. Compare sun elevation to horizon angle for each point.
+
+        2. Adjust DNI based on data. If sun elevation is higher than horizon, set DNI to 0.
+
+        3. Adjust GHI and set it to DHI for time-periods where 'dni_adjusted' is 0.
+
+        4. Replace the columns DNI and GHI with adjusted values.
+
+        (PVLib example: https://pvlib-python.readthedocs.io/en/stable/gallery/shading/plot_simple_irradiance_adjustment_for_horizon_shading.html#sphx-glr-gallery-shading-plot-simple-irradiance-adjustment-for-horizon-shading-py)
+
+        :param df_weather: Weather data that contains dni, ghi columns.
+        :type df_weather: pd.Series
+        :param horizon_profile: Horizon profile horizontal angle data.
+        :type horizon_profile: pd.Series
+        """
+        location = Location(latitude=self.lat, longitude=self.lon)
+        solpos = location.get_solarposition(df_weather.index)
+        solelv = solpos.apparent_elevation
+
+        # Interpolate the horizon elevation data to the solar azimuth, and keep as a
+        # numpy array.
+        horizon_elevation_data = np.interp(
+            solpos["azimuth"], horizon_profile.index, horizon_profile
+        )
+        # Convert to Pandas Series for easier usage.
+        horizon_elevation_data = pd.Series(horizon_elevation_data, df_weather.index)
+
+        # Adjust DNI based on data - note this is returned as numpy array
+        dni_adjusted = np.where(solelv > horizon_elevation_data, df_weather["dni"], 0)
+
+        # Adjust GHI and set it to DHI for time-periods where 'dni_adjusted' is 0.
+        # Note this is returned as numpy array
+        ghi_adjusted = np.where(dni_adjusted == 0, df_weather["dhi"], df_weather["ghi"])
+
+        # Replace the columns DNI and GHI with adjusted values
+        self.logger.info("Applying horizon shading based on provided horizon profile.")
+        df_weather["dni"] = dni_adjusted
+        df_weather["ghi"] = ghi_adjusted
+
+        # Return adjusted data
+        return df_weather
+
     @staticmethod
     def get_mix_forecast(
         df_now: pd.DataFrame,
@@ -690,9 +738,24 @@ class Forecast(object):
                                 "strings_per_inverter"
                             ][i],
                         )
+                        hp = self.plant_conf["horizon_profile"][i]
                         mc = ModelChain(system, location, aoi_model="physical")
+                        # Basic validation, should have more than 10 points
+                        if len(hp) > 10:
+                            horizon_profile = pd.Series(
+                                hp, index=np.arange(0, 360, 360 / len(hp))
+                            )
+                            df_data = self.apply_horizon_shading(
+                                df_weather, horizon_profile
+                            )
+                        else:
+                            self.logger.warning(
+                                "Horizon profile has less than 10 points. Skipping adjustment."
+                            )
+                            df_data = df_weather
                         # Run the model on the weather DF indexes
-                        mc.run_model(df_weather)
+                        # mc.run_model(df_weather)
+                        mc.run_model(df_data)
                         # Extracting results for AC power
                         P_PV_forecast = P_PV_forecast + mc.results.ac
                 else:
@@ -709,9 +772,25 @@ class Forecast(object):
                         modules_per_string=self.plant_conf["modules_per_string"],
                         strings_per_inverter=self.plant_conf["strings_per_inverter"],
                     )
+                    # Get horizon profile
+                    hp = self.plant_conf["horizon_profile"]
                     mc = ModelChain(system, location, aoi_model="physical")
+                    # Basic validation, should have more than 10 points
+                    if len(hp) > 10:
+                        horizon_profile = pd.Series(
+                            hp, index=np.arange(0, 360, 360 / len(hp))
+                        )
+                        df_data = self.apply_horizon_shading(
+                            df_weather, horizon_profile
+                        )
+                    else:
+                        self.logger.warning(
+                            "Horizon profile has less than 10 points. Skipping adjustment."
+                        )
+                        df_data = df_weather
                     # Run the model on the weather DF indexes
-                    mc.run_model(df_weather)
+                    # mc.run_model(df_weather)
+                    mc.run_model(df_data)
                     # Extracting results for AC power
                     P_PV_forecast = mc.results.ac
         if set_mix_forecast:
